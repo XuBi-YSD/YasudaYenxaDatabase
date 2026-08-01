@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo cáo ngày song ngữ / Bilingual Daily Report</title>
+<style>
+  :root{
+    --ink:#132A3A; --ink-soft:#3C5A6E;
+    --paper:#F5F2EC; --paper-2:#FFFFFF; --line:#D8D2C4;
+    --blueprint:#0F3A57; --blueprint-2:#155581;
+    --amber:#F0AD00; --amber-soft:#FBE7B0; --amber-dash:#C98A00;
+    --ok:#2F6E4E; --ok-soft:#DCEEE3;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'IBM Plex Sans', Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans); line-height:1.45; }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  .topbar{ background:var(--blueprint); color:#fff; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:4px solid var(--amber); }
+  .topbar h1{ font-size:15px; margin:0; letter-spacing:.02em; font-weight:600;}
+  .topbar .sub{ font-family:var(--mono); font-size:10.5px; color:#AFC9DB; margin-top:3px;}
+  .status{ font-family:var(--mono); font-size:11px; padding:6px 10px; border:1px solid rgba(255,255,255,.35); border-radius:3px; }
+  .status.online{ color:#BFF0D0; border-color:#3F8F63;}
+  .status.offline{ color:#F0D8A0; border-color:var(--amber);}
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:20px 18px 90px; }
+  .tabbar{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab-btn{ font-family:var(--sans); font-size:12.5px; font-weight:600; padding:9px 14px; border:1px solid var(--line); background:#fff; color:var(--ink-soft); border-radius:5px 5px 0 0; cursor:pointer; border-bottom:none; display:flex; align-items:center; gap:8px; }
+  .tab-btn .tab-note{ font-family:var(--mono); font-weight:400; font-size:10px; color:#A79E8E;}
+  .tab-btn.active{ background:var(--blueprint); color:#fff; border-color:var(--blueprint);}
+  .tab-btn.active .tab-note{ color:#AFC9DB;}
+
+  .panel{ background:var(--paper-2); border:1px solid var(--line); border-radius:6px; margin-bottom:16px; overflow:hidden;}
+  .panel > .head{ display:flex; align-items:center; justify-content:space-between; background:#EFEAE0; padding:9px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; gap:6px;}
+  .panel > .head h2{ font-size:12.5px; margin:0; text-transform:uppercase; letter-spacing:.05em; color:var(--blueprint); font-weight:600;}
+  .panel > .head .hint{ font-family:var(--mono); font-size:10px; color:var(--ink-soft);}
+  .panel > .body{ padding:14px; }
+
+  .grid{ display:grid; gap:10px; }
+  .grid.cols-2{ grid-template-columns:1fr 1fr; }
+  .grid.cols-3{ grid-template-columns:1fr 1fr 1fr; }
+  .grid.cols-4{ grid-template-columns:1fr 1fr 1fr 1fr; }
+  @media (max-width:720px){ .grid.cols-2, .grid.cols-3, .grid.cols-4{ grid-template-columns:1fr; } }
+
+  label.field-label{ display:block; font-size:10.5px; font-weight:600; color:var(--ink-soft); margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em;}
+
+  .bilingual{ border:1.5px dashed var(--amber-dash); background:var(--amber-soft); border-radius:5px; padding:7px; transition:all .2s ease;}
+  .bilingual.filled{ border:1px solid var(--line); background:#fff;}
+  .bilingual .row{ display:flex; gap:5px; }
+  .bilingual input{ flex:1; border:1px solid var(--line); border-radius:4px; padding:6px 7px; font-family:var(--sans); font-size:12.5px; background:#fff; color:var(--ink);}
+  .bilingual input:focus{ outline:2px solid var(--blueprint-2); outline-offset:1px; }
+  .bilingual .tag{ font-family:var(--mono); font-size:9px; color:var(--ink-soft); width:22px; display:flex; align-items:center; justify-content:center; font-weight:600;}
+  .bilingual .preview{ margin-top:6px; padding:5px 7px; background:#fbfaf7; border-radius:4px; min-height:18px; border:1px dashed var(--line);}
+  .bilingual .preview .en{ font-style:normal; font-size:12px; color:var(--ink);}
+  .bilingual .preview .vi{ font-style:italic; font-size:12px; color:var(--ink-soft);}
+  .bilingual .preview .empty{ font-family:var(--mono); font-size:10px; color:#B7ADA0;}
+
+  input.plain, select.plain{ width:100%; border:1px solid var(--line); border-radius:4px; padding:7px 8px; font-family:var(--sans); font-size:12.5px; background:#fff;}
+
+  table.grid-table{ width:100%; border-collapse:collapse; font-size:11.5px;}
+  table.grid-table th{ background:#EFEAE0; text-align:left; padding:5px 6px; font-size:9.5px; text-transform:uppercase; letter-spacing:.02em; color:var(--ink-soft); border:1px solid var(--line); white-space:nowrap;}
+  table.grid-table td{ border:1px solid var(--line); padding:4px; vertical-align:middle;}
+  table.grid-table td input{ width:100%; border:1px solid transparent; padding:5px 5px; border-radius:3px; font-size:11.5px; font-family:var(--sans); background:transparent;}
+  table.grid-table td input:focus{ border-color:var(--blueprint-2); outline:none; background:#fff;}
+  table.grid-table .row-tag{ font-family:var(--mono); font-size:9.5px; color:var(--ink-soft); white-space:nowrap;}
+  table.grid-table .preset-note{ font-family:var(--mono); font-size:9px; color:#A79E8E;}
+  table.grid-table input.desc-input{ min-width:140px; }
+
+  .list-item{ display:flex; gap:8px; align-items:flex-start; margin-bottom:8px;}
+  .list-item .idx{ font-family:var(--mono); font-size:11px; color:var(--ink-soft); width:20px; padding-top:9px; text-align:right;}
+  .list-item .bilingual{ flex:1; }
+
+  .btn{ font-family:var(--sans); font-size:12px; font-weight:600; border:none; border-radius:4px; padding:7px 12px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+  .btn-primary{ background:var(--blueprint); color:#fff; }
+  .btn-primary:hover{ background:var(--blueprint-2); }
+  .btn-amber{ background:var(--amber); color:#3A2900; }
+  .btn-ghost{ background:transparent; color:var(--blueprint); border:1px solid var(--blueprint); }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+  .photo-page{ border:1px solid var(--line); border-radius:6px; margin-bottom:14px; overflow:hidden;}
+  .photo-page .pg-head{ background:var(--blueprint); color:#fff; font-family:var(--mono); font-size:10.5px; padding:6px 12px; display:flex; justify-content:space-between;}
+  .photo-page .caption-row{ padding:9px 11px; border-bottom:1px solid var(--line); background:#fbfaf7;}
+  .photo-page .frames{ display:grid; grid-template-columns:1fr 1fr; gap:0; }
+  .frame{ aspect-ratio:4/3; border-right:1px solid var(--line); position:relative; display:flex; align-items:center; justify-content:center; background:#F0EEE8; overflow:hidden;}
+  .frame:last-child{ border-right:none; }
+  .frame img{ width:100%; height:100%; object-fit:cover; }
+  .frame .empty-slot{ font-family:var(--mono); font-size:10.5px; color:#A79E8E; text-align:center; padding:10px;}
+  .frame input[type=file]{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .frame .add-label{ font-family:var(--mono); font-size:19px; color:#A79E8E;}
+  .frame .rm{ position:absolute; top:6px; right:6px; background:rgba(19,42,58,.75); color:#fff; border:none; width:20px; height:20px; border-radius:50%; cursor:pointer; font-size:12px; z-index:2;}
+
+  .actions-bar{ position:sticky; bottom:0; background:var(--paper-2); border-top:1px solid var(--line); padding:10px 18px; display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:wrap; box-shadow:0 -4px 14px rgba(0,0,0,.05);}
+  .actions-bar .note{ font-family:var(--mono); font-size:10px; color:var(--ink-soft); margin-right:auto;}
+
+  dialog{ border:none; border-radius:8px; padding:0; max-width:760px; width:92vw; }
+  dialog::backdrop{ background:rgba(15,30,40,.55); }
+  dialog .dhead{ background:var(--blueprint); color:#fff; padding:11px 16px; display:flex; justify-content:space-between; align-items:center;}
+  dialog .dhead h3{ margin:0; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em;}
+  dialog .dhead button{ background:none; border:none; color:#fff; font-size:17px; cursor:pointer;}
+  dialog .dbody{ padding:14px 16px; max-height:60vh; overflow:auto; font-family:var(--mono); font-size:11px; background:#0F1E27; color:#BFE3C6; white-space:pre-wrap;}
+  dialog .dfoot{ padding:11px 16px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:8px;}
+
+  @media print{ .topbar, .actions-bar, .no-print{ display:none !important; } .panel{ break-inside:avoid; } body{ background:#fff; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>Báo cáo ngày công trường — Bilingual Daily Report</h1>
+    <div class="sub">Yen Xa Sewerage System · Package 4 — bảng nhập khớp đúng cấu trúc DR1/DR2</div>
+  </div>
+  <div id="apiStatus" class="status offline">● đang kiểm tra dịch AI…</div>
+</div>
+
+<div class="wrap">
+  <div class="tabbar no-print">
+    <button class="tab-btn active" data-tab="report">📄 Daily Report <span class="tab-note">→ DR1.xlsx, kèm ảnh</span></button>
+    <button class="tab-btn" data-tab="plan">🗓 Daily Plan <span class="tab-note">→ DR2.xlsx, không ảnh</span></button>
+  </div>
+
+  <!-- ============ REPORT TAB ============ -->
+  <div class="tab-panel" data-panel="report">
+
+    <div class="panel">
+      <div class="head"><h2>Thông tin chung</h2><span class="hint">EN đứng · VI nghiêng</span></div>
+      <div class="body grid cols-3">
+        <div><label class="field-label">Working Date / Ngày làm việc</label><input type="date" class="plain" id="r_date"></div>
+        <div id="r_location" style="grid-column: span 2;"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="head">
+        <h2>Công việc hiện trường / Site Activity</h2>
+        <span class="hint">3 dòng đầu đã có sẵn mô tả — chỉ điền số liệu. Bỏ trống ô Mô tả để giữ nguyên.</span>
+      </div>
+      <div class="body" style="overflow-x:auto;" id="r_activity_wrap"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head">
+        <h2>Nhân lực & Thiết bị & Giờ làm việc</h2>
+        <span class="hint" id="r_me_hint">Cột "Loại" lấy trực tiếp từ file mẫu — chỉ điền số lượng/giờ</span>
+      </div>
+      <div class="body" style="overflow-x:auto;" id="r_manpower_wrap"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head"><h2>Nghiệm thu & thí nghiệm / Inspection &amp; Test</h2></div>
+      <div class="body" id="r_inspection"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head"><h2>Công việc ngày hôm sau / Next Day Work</h2></div>
+      <div class="body" id="r_nextday"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head"><h2>Thời tiết / Weather</h2></div>
+      <div class="body" id="r_weather"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head"><h2>Ảnh hiện trường / Site Photos</h2><span class="hint" id="photoHint">2 ảnh / trang</span></div>
+      <div class="body" id="photoPages"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ PLAN TAB ============ -->
+  <div class="tab-panel" data-panel="plan" style="display:none;">
+
+    <div class="panel">
+      <div class="head"><h2>Thông tin chung</h2></div>
+      <div class="body grid cols-3">
+        <div><label class="field-label">Working Date / Ngày làm việc</label><input type="date" class="plain" id="p_date"></div>
+        <div id="p_location" style="grid-column: span 2;"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="head">
+        <h2>Kế hoạch công việc / Planned Activity</h2>
+        <span class="hint">3 dòng đầu đã có sẵn mô tả — chỉ điền số liệu.</span>
+      </div>
+      <div class="body" style="overflow-x:auto;" id="p_activity_wrap"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head">
+        <h2>Nhân lực & Thiết bị & Giờ làm việc</h2>
+        <span class="hint" id="p_me_hint">Cột "Loại" lấy trực tiếp từ file mẫu — chỉ điền số lượng/giờ</span>
+      </div>
+      <div class="body" style="overflow-x:auto;" id="p_manpower_wrap"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head"><h2>Nghiệm thu & thí nghiệm / Inspection &amp; Test</h2></div>
+      <div class="body" id="p_inspection"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head"><h2>Công việc ngày hôm sau / Next Day Work</h2></div>
+      <div class="body" id="p_nextday"></div>
+    </div>
+
+    <div class="panel">
+      <div class="head"><h2>Thời tiết / Weather</h2></div>
+      <div class="body" id="p_weather"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="actions-bar">
+  <span class="note" id="actionNote">File 1 — Daily Report (kèm trang ảnh)</span>
+  <button class="btn btn-ghost" id="previewBtn">Xem trước dữ liệu xuất</button>
+  <button class="btn btn-ghost" id="exportBtn">⬇ Xuất JSON</button>
+  <button class="btn btn-amber" id="directExportBtn">⚡ Xuất Excel trực tiếp (local server)</button>
+</div>
+<div class="no-print" style="max-width:1180px; margin:0 auto; padding:0 18px 30px; font-family:var(--mono); font-size:10.5px; color:var(--ink-soft);">
+  <b>⚡ Xuất trực tiếp</b> cần chạy <code style="background:#EFEAE0; padding:2px 6px; border-radius:3px;">python local_server.py</code> trước (giữ cửa sổ đó mở).<br>
+  Không muốn chạy server? Dùng "Xuất JSON" rồi chạy:<br>
+  <code id="cliHint" style="background:#EFEAE0; padding:2px 6px; border-radius:3px; display:inline-block; margin-top:4px;">python json_to_excel.py report --template 20260731-DR1.xlsx --payload daily_report_payload.json --output out.xlsx</code>
+</div>
+
+<dialog id="previewDialog">
+  <div class="dhead"><h3 id="dialogTitle">Dữ liệu sẽ ghi vào Excel</h3><button id="closeDialog">✕</button></div>
+  <div class="dbody" id="previewBody"></div>
+  <div class="dfoot"><button class="btn btn-primary" id="downloadJsonBtn">Tải JSON</button></div>
+</dialog>
+
+<script>
+// ĐỔI DÒNG NÀY sau khi deploy lên Render (hoặc dịch vụ khác):
+//   const LOCAL_SERVER_BASE = "https://ten-app-cua-ban.onrender.com";
+// Mặc định (localhost) dùng khi chạy app.py / local_server.py ngay trên máy.
+const LOCAL_SERVER_BASE = "http://localhost:8765";
+
+/* ================= GLOSSARY + TRANSLATE (như bản trước) ================= */
+const GLOSSARY = {
+  "working date":"Ngày làm việc","location":"Vị trí","description":"Diễn giải",
+  "manpower":"Nhân lực","material & equipment":"Máy móc và thiết bị","working time":"Thời gian làm việc",
+  "unit":"Đơn vị","design quantity":"KLTK","type":"Loại","start":"Bắt đầu","finish":"Kết thúc",
+  "site activity":"Công việc hiện trường","inspection & test":"Nghiệm thu & thí nghiệm",
+  "rain fall":"Lượng mưa","water level":"Cao độ mực nước","comment":"Nhận xét",
+  "morning":"Buổi sáng","afternoon":"Buổi chiều","evening":"Buổi tối","sunny":"Nắng","normal":"Bình thường",
+  "cloudy":"Nhiều mây","rainy":"Mưa","clear":"Quang đãng"
+};
+for (const [k,v] of Object.entries(GLOSSARY)) { if(!GLOSSARY[v.toLowerCase()]) GLOSSARY[v.toLowerCase()] = k; }
+const VI_MARK = /[ăâđêôơưáàảãạắằẳẵặấầẩẫậếềểễệốồổỗộớờởỡợứừửữựÁÀẢÃẠĂÂĐÊÔƠƯ]/i;
+function detectLang(t){ return VI_MARK.test(t||"") ? "vi" : "en"; }
+
+let apiWorks = null;
+async function aiTranslate(text, targetLang){
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:200,
+        messages:[{role:"user", content:
+          `Translate this construction-site daily-report phrase to `+
+          `${targetLang==='vi'?'Vietnamese':'English'}. Reply with ONLY the translation:\n\n${text}`}] })
+    });
+    const data = await res.json();
+    const block = (data.content||[]).find(b=>b.type==="text");
+    if(block && block.text){ apiWorks = true; setApiStatus(true); return block.text.trim(); }
+    throw new Error("empty");
+  }catch(e){ apiWorks = false; setApiStatus(false); return null; }
+}
+function setApiStatus(ok){
+  const el = document.getElementById("apiStatus");
+  el.className = "status " + (ok?"online":"offline");
+  el.textContent = ok ? "● dịch bằng AI (Claude)" : "● ngoại tuyến — dùng từ điển nội bộ";
+}
+async function translate(text, fromLang){
+  const target = fromLang==="vi" ? "en" : "vi";
+  const key = text.trim().toLowerCase();
+  if(apiWorks !== false){ const ai = await aiTranslate(text, target); if(ai) return ai; }
+  if(GLOSSARY[key]) return GLOSSARY[key];
+  return null; // KHONG bia chu "[cần dịch]" nua -> de trong, giu 1 ngon ngu
+}
+translate("Site inspection", "en").then(()=>{ if(apiWorks===null){apiWorks=false; setApiStatus(false);} });
+setTimeout(()=>{ if(apiWorks===null) setApiStatus(false); }, 4000);
+
+/* ================= BILINGUAL FIELD WIDGET ================= */
+let fieldSeq = 0;
+function _escAttr(s){
+  return String(s || "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function makeBilingualField(container, {labelVi="", labelEn="", initEn="", initVi=""}={}){
+  const id = "bf" + (fieldSeq++);
+  const wrap = document.createElement("div");
+  const showLabel = labelEn || labelVi;
+  wrap.innerHTML = `
+    ${showLabel ? `<label class="field-label">${labelEn}${labelEn&&labelVi?" / ":""}${labelVi}</label>` : ""}
+    <div class="bilingual" id="${id}">
+      <div class="row">
+        <span class="tag">EN</span>
+        <input type="text" class="in-en" placeholder="Tiếng Anh…" value="${_escAttr(initEn)}">
+      </div>
+      <div class="row" style="margin-top:5px;">
+        <span class="tag" style="font-style:italic;">VI</span>
+        <input type="text" class="in-vi" placeholder="Tiếng Việt…" value="${_escAttr(initVi)}">
+      </div>
+      <div class="preview"><span class="empty">— trống —</span></div>
+    </div>`;
+  container.appendChild(wrap);
+  const root = wrap.querySelector(".bilingual");
+  const enI = root.querySelector(".in-en");
+  const viI = root.querySelector(".in-vi");
+  const prev = root.querySelector(".preview");
+
+  async function refresh(triggerTranslate){
+    let en = enI.value.trim(), vi = viI.value.trim();
+    if(triggerTranslate && en && !vi){ const t = await translate(en,"en"); if(t){vi=t; viI.value=t;} }
+    else if(triggerTranslate && vi && !en){ const t = await translate(vi,"vi"); if(t){en=t; enI.value=t;} }
+    if(!en && !vi){ prev.innerHTML = `<span class="empty">— trống —</span>`; root.classList.remove("filled"); }
+    else{ prev.innerHTML = `<div class="en">${en||"&nbsp;"}</div><div class="vi">${vi||"&nbsp;"}</div>`; root.classList.add("filled"); }
+  }
+  enI.addEventListener("blur", ()=>refresh(true));
+  viI.addEventListener("blur", ()=>refresh(true));
+  enI.addEventListener("input", ()=>refresh(false));
+  viI.addEventListener("input", ()=>refresh(false));
+  refresh(false);
+  return { getData: ()=>{ const en=enI.value.trim(), vi=viI.value.trim(); return (en||vi) ? {en,vi} : null; } };
+}
+
+/* ================= GENERIC ROW-CONFIG BUILDERS ================= */
+function buildLocationField(containerId){
+  return makeBilingualField(document.getElementById(containerId), {labelEn:"Location", labelVi:"Vị trí"});
+}
+
+// rowSpecs: [{preset:true/false}] — dong dau (row8) LUON preset:true.
+// hasAccumulated: bool — DR1 dung cot F (accumulated), DR2 dung cot G
+// (backend tu anh xa dung cot, o day chi can biet CO hay KHONG).
+function buildActivityTable(containerId, rowSpecs, hasAccumulated){
+  const wrap = document.getElementById(containerId);
+  const table = document.createElement("table");
+  table.className = "grid-table";
+  table.innerHTML = `
+    <thead><tr>
+      <th style="width:26px;">#</th>
+      <th>Mô tả (bỏ trống = giữ nguyên nếu đã có sẵn)<br>Description</th>
+      <th style="width:75px;">Đơn vị<br>Unit</th>
+      <th style="width:80px;">KLTK<br>Design Qty</th>
+      <th style="width:80px;">KLTH hôm nay<br>Qty today</th>
+      ${hasAccumulated ? `<th style="width:80px;">KLLK<br>Accumulated</th>` : ""}
+    </tr></thead>`;
+  const tbody = document.createElement("tbody");
+  const rows = [];
+  rowSpecs.forEach((spec, i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="row-tag">${i+1}${spec.preset ? '<div class="preset-note">có sẵn</div>' : ""}</td>
+      <td class="desc-cell"></td>
+      <td><input class="unit" placeholder="${spec.preset?'(giữ nguyên)':''}"></td>
+      <td><input class="design_qty" type="number" step="any"></td>
+      <td><input class="qty_today" type="number" step="any"></td>
+      ${hasAccumulated ? `<td><input class="accumulated" type="number" step="any"></td>` : ""}`;
+    tbody.appendChild(tr);
+    const descField = makeBilingualField(tr.querySelector(".desc-cell"));
+    rows.push({tr, descField, hasAccumulated});
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return {
+    getData: ()=> rows.map(r=>{
+      const item = {
+        description: r.descField.getData(),
+        unit: r.tr.querySelector(".unit").value || null,
+        design_qty: r.tr.querySelector(".design_qty").value || null,
+        qty_today: r.tr.querySelector(".qty_today").value || null,
+      };
+      if(r.hasAccumulated) item.accumulated = r.tr.querySelector(".accumulated").value || null;
+      return item;
+    })
+  };
+}
+
+// Bang Nhan luc & Thiet bi & Gio lam viec — cot "Loai" CHI DOC neu file
+// mau da co san nhan (vd G8="M"); TU DONG CHUYEN THANH O NHAP khi file
+// mau dang de TRONG o do (vd G15:G17) — de bo sung loai moi khi can.
+async function fetchLegend(endpoint){
+  try{
+    const res = await fetch(LOCAL_SERVER_BASE + endpoint);
+    if(!res.ok) throw new Error("no server");
+    return await res.json();
+  }catch(e){ return null; }
+}
+function buildManpowerEquipTable(containerId, nRows, hintId){
+  const wrap = document.getElementById(containerId);
+  const table = document.createElement("table");
+  table.className = "grid-table";
+  table.innerHTML = `
+    <thead><tr>
+      <th style="width:26px;">#</th>
+      <th style="width:150px;">Loại nhân lực<br>Manpower type</th>
+      <th style="width:65px;">SL<br>Qty</th>
+      <th style="width:170px;">Loại thiết bị<br>Equipment type</th>
+      <th style="width:65px;">SL<br>Qty</th>
+      <th style="width:80px;">Bắt đầu<br>Start</th>
+      <th style="width:80px;">Kết thúc<br>Finish</th>
+    </tr></thead>`;
+  const tbody = document.createElement("tbody");
+  const rows = [];
+  for(let i=0;i<nRows;i++){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="row-tag">${i+1}</td>
+      <td class="legend-manpower-wrap" style="font-family:var(--mono); font-size:10.5px; color:var(--ink-soft);">…</td>
+      <td><input class="manpower_qty" type="number" step="any"></td>
+      <td class="legend-equip-wrap" style="font-family:var(--mono); font-size:10.5px; color:var(--ink-soft);">…</td>
+      <td><input class="equip_qty" type="number" step="any"></td>
+      <td><input class="start" type="time"></td>
+      <td><input class="finish" type="time"></td>`;
+    tbody.appendChild(tr);
+    rows.push({tr, manpowerLegendField:null, equipLegendField:null, manpowerLegendText:null, equipLegendText:null});
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+
+  function applyLegend(legend){
+    const hintEl = document.getElementById(hintId);
+    if(!legend){
+      rows.forEach(r=>{
+        r.tr.querySelector(".legend-manpower-wrap").textContent = "— (chưa kết nối local server)";
+        r.tr.querySelector(".legend-equip-wrap").textContent = "—";
+      });
+      if(hintEl) hintEl.textContent = "Chưa kết nối local server nên chưa hiện được nhãn thật — vẫn nhập số liệu bình thường.";
+      return;
+    }
+    legend.forEach((row, i)=>{
+      if(!rows[i]) return;
+      const r = rows[i];
+      const mCell = r.tr.querySelector(".legend-manpower-wrap");
+      const eCell = r.tr.querySelector(".legend-equip-wrap");
+      if(row.manpower_legend){
+        mCell.textContent = row.manpower_legend;
+        r.manpowerLegendText = row.manpower_legend;
+      } else {
+        // Trong trong file mau -> cho nhap moi (vd G15:G17)
+        mCell.innerHTML = "";
+        mCell.style.color = "";
+        r.manpowerLegendField = makeBilingualField(mCell, {labelEn:"", labelVi:""});
+        mCell.querySelector("label")?.remove();
+      }
+      if(row.equip_legend){
+        eCell.textContent = row.equip_legend;
+        r.equipLegendText = row.equip_legend;
+      } else {
+        eCell.innerHTML = "";
+        eCell.style.color = "";
+        r.equipLegendField = makeBilingualField(eCell, {labelEn:"", labelVi:""});
+        eCell.querySelector("label")?.remove();
+      }
+    });
+    if(hintEl) hintEl.textContent = 'Cột "Loại" lấy trực tiếp từ file mẫu thật — ô còn trống cho phép nhập loại mới.';
+  }
+
+  return {
+    loadLegend: async (endpoint)=> applyLegend(await fetchLegend(endpoint)),
+    getData: ()=> rows.map(r=>{
+      const item = {
+        manpower_qty: r.tr.querySelector(".manpower_qty").value || null,
+        equip_qty: r.tr.querySelector(".equip_qty").value || null,
+        start: r.tr.querySelector(".start").value || null,
+        finish: r.tr.querySelector(".finish").value || null,
+      };
+      if(r.manpowerLegendField) item.manpower_legend = r.manpowerLegendField.getData();
+      if(r.equipLegendField) item.equip_legend = r.equipLegendField.getData();
+      return item;
+    })
+  };
+}
+
+function buildTextList(containerId, count, labels){
+  const c = document.getElementById(containerId);
+  const items = [];
+  for(let i=0;i<count;i++){
+    const row = document.createElement("div");
+    row.className = "list-item";
+    row.innerHTML = `<div class="idx">${i+1}.</div><div class="bilingual-slot"></div>`;
+    c.appendChild(row);
+    const f = makeBilingualField(row.querySelector(".bilingual-slot"));
+    items.push(f);
+  }
+  return { getData: ()=> items.map(f=>f.getData()) };
+}
+
+function buildWeatherBlock(containerId){
+  const c = document.getElementById(containerId);
+  c.innerHTML = `<div class="grid cols-3" style="margin-bottom:10px;">
+      <div><label class="field-label">Sáng / Morning</label><input class="plain wcond" data-k="morning_cond" placeholder="Sunny / Cloudy…"></div>
+      <div><label class="field-label">Chiều / Afternoon</label><input class="plain wcond" data-k="afternoon_cond" placeholder="Sunny / Cloudy…"></div>
+      <div><label class="field-label">Tối / Evening</label><input class="plain wcond" data-k="evening_cond" placeholder="Normal…"></div>
+    </div>
+    <div class="grid cols-4" style="margin-bottom:10px;">
+      <div><label class="field-label">Nhiệt độ sáng / Temp AM (°C)</label><input class="plain wnum" data-k="temp_morning" type="number"></div>
+      <div><label class="field-label">Nhiệt độ chiều / Temp PM (°C)</label><input class="plain wnum" data-k="temp_afternoon" type="number"></div>
+      <div><label class="field-label">Lượng mưa / Rainfall</label><input class="plain wnum" data-k="rainfall" type="number" step="any"></div>
+      <div><label class="field-label">Mực nước / Water level</label><input class="plain wnum" data-k="water_level" type="number" step="any"></div>
+    </div>
+    <div id="${containerId}_comment"></div>`;
+  const commentField = makeBilingualField(document.getElementById(`${containerId}_comment`), {labelEn:"Comment", labelVi:"Nhận xét"});
+  return {
+    getData: ()=>{
+      const out = {};
+      c.querySelectorAll(".wcond,.wnum").forEach(inp=>{ if(inp.value) out[inp.dataset.k]=inp.value; });
+      out.comment = commentField.getData();
+      return out;
+    }
+  };
+}
+
+/* ================= BUILD BOTH TABS ================= */
+const r_location = buildLocationField("r_location");
+const r_activity = buildActivityTable("r_activity_wrap",
+  [{preset:true},{preset:true},{preset:true},{preset:true},{preset:false},{preset:false},{preset:false},{preset:false},{preset:false},{preset:false}],
+  true);
+const r_manpower = buildManpowerEquipTable("r_manpower_wrap", 10, "r_me_hint");
+r_manpower.loadLegend("/legend/report");
+const r_inspection = buildTextList("r_inspection", 2);
+const r_nextday = buildTextList("r_nextday", 6);
+const r_weather = buildWeatherBlock("r_weather");
+
+const p_location = buildLocationField("p_location");
+const p_activity = buildActivityTable("p_activity_wrap",
+  [{preset:true},{preset:true},{preset:true},{preset:true},{preset:false},{preset:false},{preset:false},{preset:false}],
+  true);
+const p_manpower = buildManpowerEquipTable("p_manpower_wrap", 8, "p_me_hint");
+p_manpower.loadLegend("/legend/plan");
+const p_inspection = buildTextList("p_inspection", 2);
+const p_nextday = buildTextList("p_nextday", 6);
+const p_weather = buildWeatherBlock("p_weather");
+
+/* ================= PHOTOS (Daily Report only) ================= */
+const photoPagesEl = document.getElementById("photoPages");
+let photos = [];
+let pageCaptions = [];
+function renderPhotoPages(){
+  // *** FIX LOI: mo ta bi mat khi tai them anh ***
+  // Truoc day photoPagesEl.innerHTML="" xoa sach DOM va tao lai o mo ta
+  // TRANG (khong con gia tri cu) moi lan co anh them/xoa -> nguoi dung
+  // go mo ta trang 1 xong, tai anh cho trang 2 la MAT SACH mo ta trang 1.
+  // Fix: luu lai gia tri hien tai cua tung o mo ta TRUOC khi xoa DOM,
+  // roi khoi tao lai o moi VOI gia tri da luu do.
+  const savedCaptions = pageCaptions.map(c => c.getData() || {en:"", vi:""});
+
+  photoPagesEl.innerHTML = "";
+  const nPages = Math.max(1, Math.ceil((photos.length+1) / 2));
+  pageCaptions = [];
+  for(let p=0; p<nPages; p++){
+    const page = document.createElement("div");
+    page.className = "photo-page";
+    page.innerHTML = `
+      <div class="pg-head"><span>TRANG ẢNH ${p+1}</span><span>Ảnh ${p*2+1}–${p*2+2}</span></div>
+      <div class="caption-row"></div>
+      <div class="frames"></div>`;
+    photoPagesEl.appendChild(page);
+    const saved = savedCaptions[p] || {en:"", vi:""};
+    const cap = makeBilingualField(page.querySelector(".caption-row"),
+      {labelEn:"Description (2 photos)", labelVi:"Mô tả (2 ảnh)", initEn: saved.en, initVi: saved.vi});
+    pageCaptions.push(cap);
+    const frames = page.querySelector(".frames");
+    for(let s=0; s<2; s++){
+      const idx = p*2+s;
+      const frame = document.createElement("div");
+      frame.className = "frame";
+      if(photos[idx]){
+        frame.innerHTML = `<img src="${photos[idx].dataUrl}"><button class="rm" data-idx="${idx}">✕</button>`;
+        frame.querySelector(".rm").addEventListener("click", (e)=>{ e.stopPropagation(); photos.splice(idx,1); renderPhotoPages(); });
+      } else {
+        frame.innerHTML = `<div class="empty-slot"><div class="add-label">+</div>Khung ảnh cố định</div><input type="file" accept="image/*">`;
+        frame.querySelector("input[type=file]").addEventListener("change", (e)=>{
+          const f = e.target.files[0]; if(!f) return;
+          const reader = new FileReader();
+          reader.onload = ()=>{ photos[idx] = {dataUrl: reader.result}; renderPhotoPages(); };
+          reader.readAsDataURL(f);
+        });
+      }
+      frames.appendChild(frame);
+    }
+  }
+  document.getElementById("photoHint").textContent = `${photos.length} ảnh · ${nPages} trang (tự tăng khi thêm ảnh)`;
+}
+renderPhotoPages();
+
+/* ================= TAB SWITCH ================= */
+let activeTab = "report";
+document.querySelectorAll(".tab-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active", b===btn));
+    document.querySelectorAll(".tab-panel").forEach(p=>{ p.style.display = (p.dataset.panel===activeTab) ? "" : "none"; });
+    const isReport = activeTab==="report";
+    document.getElementById("actionNote").textContent = isReport
+      ? "File 1 — Daily Report (kèm trang ảnh)" : "File 2 — Daily Plan (KHÔNG kèm ảnh)";
+    document.getElementById("exportBtn").textContent = "⬇ Xuất JSON";
+    document.getElementById("cliHint").textContent = isReport
+      ? "python json_to_excel.py report --template 20260731-DR1.xlsx --payload daily_report_payload.json --output out.xlsx"
+      : "python json_to_excel.py plan --template 20260731-DR2.xlsx --payload daily_plan_payload.json --output out.xlsx";
+  });
+});
+
+/* ================= PAYLOAD COLLECTION ================= */
+function collectReportPayload(){
+  return {
+    target_file: "daily_report.xlsx (DR1 — có trang ảnh)",
+    sheet_data: {
+      "Daily report for PJ": {
+        date: document.getElementById("r_date").value || null,
+        location: r_location.getData(),
+        activities: r_activity.getData(),
+        manpower_equip: r_manpower.getData(),
+        inspections: r_inspection.getData(),
+        next_day_work: r_nextday.getData(),
+        weather: r_weather.getData(),
+      }
+    },
+    photos: photos.filter(Boolean).map((ph, i)=>({
+      index:i, page: Math.floor(i/2)+1,
+      caption: pageCaptions[Math.floor(i/2)] ? pageCaptions[Math.floor(i/2)].getData() : null,
+      dataUrl: ph.dataUrl
+    })),
+  };
+}
+function collectPlanPayload(){
+  return {
+    target_file: "daily_plan.xlsx (DR2 — KHÔNG có trang ảnh)",
+    sheet_data: {
+      "Daily Plan for PJ": {
+        date: document.getElementById("p_date").value || null,
+        location: p_location.getData(),
+        activities: p_activity.getData(),
+        manpower_equip: p_manpower.getData(),
+        inspections: p_inspection.getData(),
+        next_day_work: p_nextday.getData(),
+        weather: p_weather.getData(),
+      }
+    },
+  };
+}
+function currentPayload(){ return activeTab==="report" ? collectReportPayload() : collectPlanPayload(); }
+function currentFilename(){ return activeTab==="report" ? "daily_report_payload.json" : "daily_plan_payload.json"; }
+
+document.getElementById("previewBtn").addEventListener("click", ()=>{
+  document.getElementById("dialogTitle").textContent = activeTab==="report" ? "Dữ liệu → daily_report.xlsx" : "Dữ liệu → daily_plan.xlsx";
+  document.getElementById("previewBody").textContent = JSON.stringify(currentPayload(), null, 2);
+  document.getElementById("previewDialog").showModal();
+});
+document.getElementById("closeDialog").addEventListener("click", ()=>document.getElementById("previewDialog").close());
+function downloadJson(){
+  const blob = new Blob([JSON.stringify(currentPayload(), null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = currentFilename();
+  a.click();
+}
+document.getElementById("exportBtn").addEventListener("click", downloadJson);
+document.getElementById("downloadJsonBtn").addEventListener("click", downloadJson);
+
+/* ================= DIRECT EXPORT (local server) ================= */
+document.getElementById("directExportBtn").addEventListener("click", async ()=>{
+  const btn = document.getElementById("directExportBtn");
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ Đang xuất…";
+  try{
+    const endpoint = activeTab==="report" ? "/convert/report" : "/convert/plan";
+    const res = await fetch(LOCAL_SERVER_BASE + endpoint, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(currentPayload())
+    });
+    if(!res.ok){ const err = await res.json().catch(()=>({error: res.statusText})); throw new Error(err.error || res.statusText); }
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") || "";
+    const m = /filename="([^"]+)"/.exec(cd);
+    const filename = m ? m[1] : (activeTab==="report" ? "daily_report_output.xlsx" : "daily_plan_output.xlsx");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  }catch(e){
+    alert("Không xuất trực tiếp được.\n\nKiểm tra: đã chạy 'python local_server.py' và cửa sổ đó còn mở chưa?\n\nChi tiết lỗi: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = original;
+  }
+});
+</script>
+</body>
+</html>
