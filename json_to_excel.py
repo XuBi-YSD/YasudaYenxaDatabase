@@ -259,6 +259,11 @@ def build_data_dict(payload: dict, field_map: dict, template_path: str = None):
             val = _bilingual_or_none(val) if isinstance(val, dict) else val
             if val in (None, ""):
                 continue
+            if key == "manpower_qty":
+                # Dong dau tien (row8) = nhan luc Nhat Ban -> "(JP)";
+                # cac dong con lai = nhan luc Viet Nam -> "(VN)" khi co so lieu.
+                suffix = " (JP)" if row_no == me_rows[0] else " (VN)"
+                val = f"{val}{suffix}"
             col = me_cols[key]
             fields[f"{col}{row_no}"] = val
             applied.append(f"manpower_equip[row {row_no}].{key} -> {col}{row_no}")
