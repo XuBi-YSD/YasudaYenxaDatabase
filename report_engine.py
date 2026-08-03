@@ -45,9 +45,27 @@ from openpyxl.utils import get_column_letter, column_index_from_string
 FONT_NAME = "Arial"   # font mac dinh CHI dung khi khong doc duoc font goc cua o
 
 
+_XML_INVALID_RE = re.compile(
+    "[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ufdd0-\ufdef\ufffe\uffff]"
+)
+
+
+def _sanitize_xml_text(s: str) -> str:
+    """Loai bo ky tu dieu khien KHONG hop le trong XML 1.0 — neu lot vao
+    noi dung o (vd tu ket qua API dich bi loi/tra ve du lieu la) se lam
+    HONG FILE .xlsx (Excel bao 'found a problem with content', da gap
+    thuc te). Day la lop bao ve cuoi cung, khong phu thuoc nguon du lieu
+    dau vao co sach hay khong."""
+    if not s:
+        return s
+    return _XML_INVALID_RE.sub("", s)
+
+
 def bilingual_richtext(en: str, vi: str, size: float = 11, bold: bool = False,
                         font_name: str = None):
-    """Tra ve CellRichText: dong 1 = tieng Anh (dung), dong 2 = tieng Viet (nghieng).
+    """Tra ve CellRichText: dong 1 = tieng Anh (dung) + dau '/' cuoi dong
+    (dung quy uoc cua chinh template goc, vd 'Ngày làm việc/\\nWorking
+    Date'), dong 2 = tieng Viet (nghieng).
     Neu chi co 1 trong 2 chuoi -> chi ghi chuoi do (van dung font thuong).
     Neu ca hai deu rong -> tra ve None (o se duoc de TRONG, xem clear_or_fill).
 
@@ -55,8 +73,8 @@ def bilingual_richtext(en: str, vi: str, size: float = 11, bold: bool = False,
     dich (vd template dung Times New Roman 20pt cho cot B, 24pt cho o Vi
     tri) — khong duoc de mac dinh Arial 11pt, neu khong chu se in ra qua
     NHO so voi phan con lai cua bao cao (loi da gap thuc te)."""
-    en = (en or "").strip()
-    vi = (vi or "").strip()
+    en = _sanitize_xml_text((en or "").strip())
+    vi = _sanitize_xml_text((vi or "").strip())
     if not en and not vi:
         return None
     fn = font_name or FONT_NAME
@@ -64,7 +82,7 @@ def bilingual_richtext(en: str, vi: str, size: float = 11, bold: bool = False,
     italic = InlineFont(rFont=fn, sz=size, b=bold, i=True)
     parts = []
     if en:
-        parts.append(TextBlock(normal, en))
+        parts.append(TextBlock(normal, en + (" /" if vi else "")))
     if en and vi:
         parts.append("\n")
     if vi:
@@ -169,8 +187,8 @@ def make_bilingual(en_input: str, vi_input: str, glossary: dict, size=11, bold=F
 
     `size`/`font_name`: PHAI la font THAT cua o dich (xem ghi chu trong
     bilingual_richtext) — caller doc tu cell.font truoc khi goi ham nay."""
-    en_input = (en_input or "").strip()
-    vi_input = (vi_input or "").strip()
+    en_input = _sanitize_xml_text((en_input or "").strip())
+    vi_input = _sanitize_xml_text((vi_input or "").strip())
     if not en_input and not vi_input:
         return None, False
 
@@ -178,13 +196,13 @@ def make_bilingual(en_input: str, vi_input: str, glossary: dict, size=11, bold=F
     if en_input and not vi_input:
         translated = translate(en_input, glossary)
         if translated:
-            vi_input = translated
+            vi_input = _sanitize_xml_text(translated)
         else:
             needs_review = True
     elif vi_input and not en_input:
         translated = translate(vi_input, glossary)
         if translated:
-            en_input = translated
+            en_input = _sanitize_xml_text(translated)
         else:
             needs_review = True
 
