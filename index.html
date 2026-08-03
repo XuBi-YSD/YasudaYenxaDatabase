@@ -255,6 +255,42 @@ for (const [k,v] of Object.entries(GLOSSARY)) { if(!GLOSSARY[v.toLowerCase()]) G
 const VI_MARK = /[ăâđêôơưáàảãạắằẳẵặấầẩẫậếềểễệốồổỗộớờởỡợứừửữựÁÀẢÃẠĂÂĐÊÔƠƯ]/i;
 function detectLang(t){ return VI_MARK.test(t||"") ? "vi" : "en"; }
 
+// *** Thuat ngu rieng CUA DU AN — luon uu tien hon MT tong quat ***
+// "Shaft" trong nganh xay dung ham/giong khoan phai dich la "Hố" (khong
+// phai "Trục" nhu MyMemory/Google Translate hay tra ve theo nghia co khi
+// thong thuong). Ap dung SAU khi dich (thay the tu, khong phu thuoc dich
+// vu dich nao dang duoc dung) de dam bao dung thuat ngu du an moi lan.
+const TERM_OVERRIDES_EN_TO_VI = [ [/\bshaft\b/gi, "Hố"] ];
+const TERM_OVERRIDES_VI_TO_EN = [ [/\bhố\b/gi, "Shaft"] ];
+function applyTerminologyOverrides(text, targetLang){
+  if(!text) return text;
+  const rules = targetLang === "vi" ? TERM_OVERRIDES_EN_TO_VI : TERM_OVERRIDES_VI_TO_EN;
+  let out = text;
+  for(const [pattern, replacement] of rules) out = out.replace(pattern, replacement);
+  return out;
+}
+
+// *** Kiem tra ket qua dich co dang bi LOI/DINH CHU GOC khong ***
+// Da gap thuc te: 1 lan MyMemory tra ve chuoi dinh lien ca cau goc va
+// ban dich khong co dau cach (vd "install jacking culvertlắp cống kích")
+// — neu ghi thang vao file se lam HONG FILE EXCEL. Ham nay phat hien va
+// LOAI BO nhung ket qua dang ngo vuc nay thay vi chap nhan mu quang.
+function looksLikeGarbledTranslation(original, translated){
+  if(!translated) return true;
+  const o = original.trim().toLowerCase();
+  const t = translated.trim().toLowerCase();
+  if(t.length === 0) return true;
+  // Ket qua dai bat thuong so voi cau goc (vd gap hon 2.5 lan + co chua
+  // nguyen van cau goc ben trong) -> nghi ngo bi dinh/echo.
+  if(t.length > o.length * 2.5 && t.includes(o)) return true;
+  // Dinh 2 cau khong co khoang trang/dau cau o giua (dau hieu ro nhat).
+  if(/[a-zà-ỹ][A-ZÀ-Ỹ]/.test(translated) && !/[.,;:!?\s]/.test(translated.slice(Math.max(0,translated.search(/[a-zà-ỹ][A-ZÀ-Ỹ]/))-1, translated.search(/[a-zà-ỹ][A-ZÀ-Ỹ]/)+2))) {
+    // co doan chu thuong ngay sau la chu hoa, khong co dau ngan cach quanh do
+    return true;
+  }
+  return false;
+}
+
 let apiWorks = null;       // Claude API (chi hoat dong trong moi truong Claude.ai)
 let myMemoryWorks = null;  // MyMemory API (mien phi, khong can dang ky, chay duoc moi noi ke ca GitHub Pages)
 
@@ -269,7 +305,12 @@ async function aiTranslate(text, targetLang){
     });
     const data = await res.json();
     const block = (data.content||[]).find(b=>b.type==="text");
-    if(block && block.text){ apiWorks = true; setApiStatus("claude"); return block.text.trim(); }
+    if(block && block.text){
+      const result = block.text.trim();
+      if(looksLikeGarbledTranslation(text, result)){ apiWorks = false; return null; }
+      apiWorks = true; setApiStatus("claude");
+      return applyTerminologyOverrides(result, targetLang);
+    }
     throw new Error("empty");
   }catch(e){ apiWorks = false; return null; }
 }
@@ -290,8 +331,11 @@ async function myMemoryTranslate(text, targetLang){
     const data = await res.json();
     if(data.responseStatus !== 200 && data.responseStatus !== "200") throw new Error("bad status");
     const translated = data.responseData && data.responseData.translatedText;
-    if(translated){ myMemoryWorks = true; setApiStatus("mymemory"); return translated.trim(); }
-    throw new Error("empty");
+    if(translated && !looksLikeGarbledTranslation(text, translated)){
+      myMemoryWorks = true; setApiStatus("mymemory");
+      return applyTerminologyOverrides(translated.trim(), targetLang);
+    }
+    throw new Error("empty or garbled");
   }catch(e){ myMemoryWorks = false; return null; }
 }
 
@@ -304,9 +348,10 @@ function setApiStatus(mode){
 async function translate(text, fromLang){
   const target = fromLang==="vi" ? "en" : "vi";
   const key = text.trim().toLowerCase();
+  // Uu tien tu dien du an (thuat ngu chinh xac) truoc khi goi MT tong quat.
+  if(GLOSSARY[key]) return applyTerminologyOverrides(GLOSSARY[key], target);
   if(apiWorks !== false){ const ai = await aiTranslate(text, target); if(ai) return ai; }
   if(myMemoryWorks !== false){ const mm = await myMemoryTranslate(text, target); if(mm) return mm; }
-  if(GLOSSARY[key]) return GLOSSARY[key];
   setApiStatus("offline");
   return null; // KHONG bia chu "[cần dịch]" nua -> de trong, giu 1 ngon ngu
 }
@@ -561,9 +606,12 @@ function buildWeatherBlock(containerId){
       <div><label class="field-label">Chiều / Afternoon</label><input class="plain wcond" data-k="afternoon_cond" placeholder="Sunny / Cloudy…"></div>
       <div><label class="field-label">Tối / Evening</label><input class="plain wcond" data-k="evening_cond" placeholder="Normal…"></div>
     </div>
-    <div class="grid cols-4" style="margin-bottom:10px;">
+    <div class="grid cols-3" style="margin-bottom:10px;">
       <div><label class="field-label">Nhiệt độ sáng / Temp AM (°C)</label><input class="plain wnum" data-k="temp_morning" type="number"></div>
       <div><label class="field-label">Nhiệt độ chiều / Temp PM (°C)</label><input class="plain wnum" data-k="temp_afternoon" type="number"></div>
+      <div><label class="field-label">Nhiệt độ tối / Temp Evening (°C)</label><input class="plain wnum" data-k="temp_evening" type="number"></div>
+    </div>
+    <div class="grid cols-2" style="margin-bottom:10px;">
       <div><label class="field-label">Lượng mưa / Rainfall</label><input class="plain wnum" data-k="rainfall" type="number" step="any"></div>
       <div><label class="field-label">Mực nước / Water level</label><input class="plain wnum" data-k="water_level" type="number" step="any"></div>
     </div>
