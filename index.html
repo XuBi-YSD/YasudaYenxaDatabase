@@ -236,10 +236,10 @@
 </dialog>
 
 <script>
-// ĐỔI DÒNG NÀY sau khi deploy lên Render (hoặc dịch vụ khác):
-//   const LOCAL_SERVER_BASE = "https://ten-app-cua-ban.onrender.com";
-// Mặc định (localhost) dùng khi chạy app.py / local_server.py ngay trên máy.
-const LOCAL_SERVER_BASE = "https://yasudayenxadatabase.onrender";
+// Mac dinh tro thang toi server online (Render) — khong con phai sua tay
+// moi lan nhan file moi nua. Neu ban chay local_server.py/app.py TREN MAY
+// de test rieng, doi dong duoi thanh: "http://localhost:8765"
+const LOCAL_SERVER_BASE = "https://yasudayenxadatabase.onrender.com";
 
 /* ================= GLOSSARY + TRANSLATE (như bản trước) ================= */
 const GLOSSARY = {
@@ -493,12 +493,21 @@ function buildActivityTable(containerId, rowSpecs, hasAccumulated){
 // Bang Nhan luc & Thiet bi & Gio lam viec — cot "Loai" CHI DOC neu file
 // mau da co san nhan (vd G8="M"); TU DONG CHUYEN THANH O NHAP khi file
 // mau dang de TRONG o do (vd G15:G17) — de bo sung loai moi khi can.
-async function fetchLegend(endpoint){
+//
+// TU DONG THU LAI (retry) 2 lan neu that bai — server Render (goi mien
+// phi) "ngu" sau ~15 phut khong ai dung, lan goi dau tien co the mat
+// 30-60 giay de "thuc day". Khong retry se hien "chua ket noi" du server
+// thuc ra van hoat dong, chi la chua kip phan hoi lan dau.
+function _sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+async function fetchLegend(endpoint, attempt=1){
   try{
     const res = await fetch(LOCAL_SERVER_BASE + endpoint);
     if(!res.ok) throw new Error("no server");
     return await res.json();
-  }catch(e){ return null; }
+  }catch(e){
+    if(attempt < 3){ await _sleep(4000); return fetchLegend(endpoint, attempt+1); }
+    return null;
+  }
 }
 function buildManpowerEquipTable(containerId, nRows, hintId){
   const wrap = document.getElementById(containerId);
@@ -538,10 +547,10 @@ function buildManpowerEquipTable(containerId, nRows, hintId){
     const hintEl = document.getElementById(hintId);
     if(!legend){
       rows.forEach(r=>{
-        r.tr.querySelector(".legend-manpower-wrap").textContent = "— (chưa kết nối local server)";
+        r.tr.querySelector(".legend-manpower-wrap").textContent = "— (không kết nối được server)";
         r.tr.querySelector(".legend-equip-wrap").textContent = "—";
       });
-      if(hintEl) hintEl.textContent = "Chưa kết nối local server nên chưa hiện được nhãn thật — vẫn nhập số liệu bình thường.";
+      if(hintEl) hintEl.textContent = "Không kết nối được server (đã thử 3 lần) — kiểm tra lại địa chỉ LOCAL_SERVER_BASE trong file, hoặc tải lại trang. Vẫn nhập số liệu bình thường được.";
       return;
     }
     legend.forEach((row, i)=>{
