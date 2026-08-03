@@ -77,8 +77,8 @@ REPORT_FIELDS = {
     "next_day_rows": [22, 23, 24, 25, 26, 27],
     "next_day_col": "J",
     "weather": {
-        "morning_cond": "I31", "afternoon_cond": "J31", "evening_cond": "K31",  # N31 khong phai cong thuc co dinh, nhung khong dung trong app nay
-        "temp_morning": "L31", "temp_afternoon": "M31",
+        "morning_cond": "I31", "afternoon_cond": "J31", "evening_cond": "K31",
+        "temp_morning": "L31", "temp_afternoon": "M31", "temp_evening": "N31",
         "rainfall": "O30", "water_level": "P30", "comment": "Q30",
     },
 }
@@ -109,8 +109,8 @@ PLAN_FIELDS = {
     "next_day_rows": [22, 23, 24, 25, 26, 27],
     "next_day_col": "K",   # DR2 dung cot K, khong phai J nhu DR1
     "weather": {
-        "morning_cond": "K29", "afternoon_cond": "L29", "evening_cond": "N29",  # Q29 la cong thuc
-        "temp_morning": "O29", "temp_afternoon": "P29",
+        "morning_cond": "K29", "afternoon_cond": "L29", "evening_cond": "N29",
+        "temp_morning": "O29", "temp_afternoon": "P29", "temp_evening": "Q29",
         "rainfall": "R28", "water_level": "S28", "comment": "T28",
     },
 }
@@ -286,7 +286,7 @@ def build_data_dict(payload: dict, field_map: dict, template_path: str = None):
     wm = field_map["weather"]
     for key in ("morning_cond", "afternoon_cond", "evening_cond"):
         _set(wm[key], w.get(key), f"weather.{key}")
-    for key in ("temp_morning", "temp_afternoon", "rainfall", "water_level"):
+    for key in ("temp_morning", "temp_afternoon", "temp_evening", "rainfall", "water_level"):
         _set(wm[key], w.get(key), f"weather.{key}")
     _set(wm["comment"], _bilingual_or_none(w.get("comment")), "weather.comment")
 
