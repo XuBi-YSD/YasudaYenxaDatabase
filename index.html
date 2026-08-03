@@ -239,7 +239,7 @@
 // ĐỔI DÒNG NÀY sau khi deploy lên Render (hoặc dịch vụ khác):
 //   const LOCAL_SERVER_BASE = "https://ten-app-cua-ban.onrender.com";
 // Mặc định (localhost) dùng khi chạy app.py / local_server.py ngay trên máy.
-const LOCAL_SERVER_BASE = "https://yasudayenxadatabase.onrender.com";
+const LOCAL_SERVER_BASE = "http://localhost:8765";
 
 /* ================= GLOSSARY + TRANSLATE (như bản trước) ================= */
 const GLOSSARY = {
@@ -275,17 +275,20 @@ function applyTerminologyOverrides(text, targetLang){
 // ban dich khong co dau cach (vd "install jacking culvertlắp cống kích")
 // — neu ghi thang vao file se lam HONG FILE EXCEL. Ham nay phat hien va
 // LOAI BO nhung ket qua dang ngo vuc nay thay vi chap nhan mu quang.
+//
+// SUA LOI (ban truoc): tung dung kiem tra "chu thuong ngay sau la chu
+// hoa" de phat hien dinh chu — NHUNG cach Unicode sap xep cac ky tu co
+// dau tieng Viet (vd "ô" trong "Không") khien kiem tra do NHAN NHAM hang
+// loat ban dich HOAN TOAN DUNG la loi, lam tinh nang dich song ngu coi
+// nhu ngung hoat dong. Da bo hoan toan phan kiem tra do, chi giu 1 kieu
+// kiem tra don gian va dang tin cay: ban dich co CHUA NGUYEN VAN cau goc
+// (khong phan biet hoa/thuong) VA dai hon dang ke.
 function looksLikeGarbledTranslation(original, translated){
   if(!translated) return true;
-  const o = original.trim().toLowerCase();
-  const t = translated.trim().toLowerCase();
+  const t = translated.trim();
   if(t.length === 0) return true;
-  // Ket qua dai bat thuong so voi cau goc (vd gap hon 2.5 lan + co chua
-  // nguyen van cau goc ben trong) -> nghi ngo bi dinh/echo.
-  if(t.length > o.length * 2.5 && t.includes(o)) return true;
-  // Dinh 2 cau khong co khoang trang/dau cau o giua (dau hieu ro nhat).
-  if(/[a-zà-ỹ][A-ZÀ-Ỹ]/.test(translated) && !/[.,;:!?\s]/.test(translated.slice(Math.max(0,translated.search(/[a-zà-ỹ][A-ZÀ-Ỹ]/))-1, translated.search(/[a-zà-ỹ][A-ZÀ-Ỹ]/)+2))) {
-    // co doan chu thuong ngay sau la chu hoa, khong co dau ngan cach quanh do
+  const o = original.trim();
+  if(o.length >= 4 && t.toLowerCase().includes(o.toLowerCase()) && t.length > o.length * 1.8){
     return true;
   }
   return false;
