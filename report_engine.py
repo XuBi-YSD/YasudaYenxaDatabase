@@ -82,9 +82,16 @@ def bilingual_richtext(en: str, vi: str, size: float = 11, bold: bool = False,
     italic = InlineFont(rFont=fn, sz=size, b=bold, i=True)
     parts = []
     if en:
-        parts.append(TextBlock(normal, en + (" /" if vi else "")))
-    if en and vi:
-        parts.append("\n")
+        # QUAN TRONG - FIX LOI HONG FILE THAT: dau xuong dong PHAI nam o
+        # CUOI cua TextBlock tieng Anh (khong tach thanh 1 phan tu "\n"
+        # rieng biet dang chuoi thuong). Neu de rieng, openpyxl ghi ra
+        # <r><t>\n</t></r> KHONG CO xml:space="preserve" -> Microsoft
+        # Excel THAT coi day la noi dung hong va bat sua ("Repair Result"
+        # - da xac nhan bang file loi thuc te nguoi dung gui). LibreOffice
+        # (dung de tu kiem tra/recalc) lai chap nhan binh thuong nen loi
+        # nay khong bi phat hien qua cac lan test truoc.
+        suffix = " /\n" if vi else ""
+        parts.append(TextBlock(normal, en + suffix))
     if vi:
         parts.append(TextBlock(italic, vi))
     return CellRichText(*parts)
