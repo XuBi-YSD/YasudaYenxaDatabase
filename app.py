@@ -27,7 +27,7 @@ from pathlib import Path
 
 from flask import Flask, request, jsonify, send_file, Response
 
-from json_to_excel import REPORT_FIELDS, PLAN_FIELDS, build_data_dict, _decode_photos, read_legend
+from json_to_excel import REPORT_FIELDS, PLAN_FIELDS, build_data_dict, _decode_photos, read_legend, read_options
 from report_engine import generate_daily_report, generate_daily_plan
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -61,6 +61,20 @@ def legend_plan():
     if not TEMPLATE_PLAN.exists():
         return jsonify({"error": f"Không tìm thấy file mẫu '{TEMPLATE_PLAN.name}'"}), 500
     return jsonify(read_legend(str(TEMPLATE_PLAN), PLAN_FIELDS))
+
+
+@app.route("/options/report", methods=["GET"])
+def options_report():
+    if not TEMPLATE_REPORT.exists():
+        return jsonify({"error": f"Không tìm thấy file mẫu '{TEMPLATE_REPORT.name}'"}), 500
+    return jsonify(read_options(str(TEMPLATE_REPORT), REPORT_FIELDS))
+
+
+@app.route("/options/plan", methods=["GET"])
+def options_plan():
+    if not TEMPLATE_PLAN.exists():
+        return jsonify({"error": f"Không tìm thấy file mẫu '{TEMPLATE_PLAN.name}'"}), 500
+    return jsonify(read_options(str(TEMPLATE_PLAN), PLAN_FIELDS))
 
 
 @app.route("/convert/report", methods=["POST", "OPTIONS"])

@@ -385,20 +385,27 @@ function _attachTimeInput(input){
     input.classList.toggle("time-invalid", !ok);
   });
 }
-function makeBilingualField(container, {labelVi="", labelEn="", initEn="", initVi="", enOptions=null}={}){
+// Tach chuoi dang "EN /\nVI" (quy uoc cua template) thanh {en, vi} rieng —
+// dung de xay droplist + tra cuu ban dich THAT co san, khong doan.
+function parseSlashPair(text){
+  if(!text) return {en:"", vi:""};
+  const parts = text.split(/\s*\/\s*\n?\s*/);
+  if(parts.length >= 2) return {en: parts[0].trim(), vi: parts.slice(1).join(" ").trim()};
+  return {en: text.trim(), vi: ""};
+}
+
+function makeBilingualField(container, {labelVi="", labelEn="", initEn="", initVi="", enOptions=null, knownPairs=null}={}){
   const id = "bf" + (fieldSeq++);
   const wrap = document.createElement("div");
   const showLabel = labelEn || labelVi;
-  const datalistId = enOptions ? id + "_dl" : null;
-  const datalistHtml = enOptions
-    ? `<datalist id="${datalistId}">${enOptions.map(o=>`<option value="${_escAttr(o)}">`).join("")}</datalist>`
-    : "";
+  const datalistId = id + "_dl";
+  const datalistHtml = `<datalist id="${datalistId}">${(enOptions||[]).map(o=>`<option value="${_escAttr(o)}">`).join("")}</datalist>`;
   wrap.innerHTML = `
     ${showLabel ? `<label class="field-label">${labelEn}${labelEn&&labelVi?" / ":""}${labelVi}</label>` : ""}
     <div class="bilingual" id="${id}">
       <div class="row">
         <span class="tag">EN</span>
-        <input type="text" class="in-en" placeholder="Tiếng Anh…" value="${_escAttr(initEn)}" ${datalistId?`list="${datalistId}"`:""}>
+        <input type="text" class="in-en" placeholder="Tiếng Anh…" value="${_escAttr(initEn)}" list="${datalistId}">
         ${datalistHtml}
       </div>
       <div class="row" style="margin-top:5px;">
@@ -412,10 +419,19 @@ function makeBilingualField(container, {labelVi="", labelEn="", initEn="", initV
   const enI = root.querySelector(".in-en");
   const viI = root.querySelector(".in-vi");
   const prev = root.querySelector(".preview");
+  const datalistEl = wrap.querySelector(`#${datalistId}`);
+  let _knownPairs = knownPairs || {};
 
+  // Neu chon dung 1 muc co san trong droplist (knownPairs) -> dien VI
+  // NGAY LAP TUC bang ban dich THAT da co san trong file mau, khong can
+  // goi API dich (nhanh hon va chinh xac hon MT tong quat).
   async function refresh(triggerTranslate){
     let en = enI.value.trim(), vi = viI.value.trim();
-    if(triggerTranslate && en && !vi){ const t = await translate(en,"en"); if(t){vi=t; viI.value=t;} }
+    const knownVi = en ? _knownPairs[en.toLowerCase()] : null;
+    if(triggerTranslate && en && !vi){
+      if(knownVi){ vi=knownVi; viI.value=knownVi; }
+      else{ const t = await translate(en,"en"); if(t){vi=t; viI.value=t;} }
+    }
     else if(triggerTranslate && vi && !en){ const t = await translate(vi,"vi"); if(t){en=t; enI.value=t;} }
     if(!en && !vi){ prev.innerHTML = `<span class="empty">— trống —</span>`; root.classList.remove("filled"); }
     else{ prev.innerHTML = `<div class="en">${en||"&nbsp;"}</div><div class="vi">${vi||"&nbsp;"}</div>`; root.classList.add("filled"); }
@@ -425,7 +441,13 @@ function makeBilingualField(container, {labelVi="", labelEn="", initEn="", initV
   enI.addEventListener("input", ()=>refresh(false));
   viI.addEventListener("input", ()=>refresh(false));
   refresh(false);
-  return { getData: ()=>{ const en=enI.value.trim(), vi=viI.value.trim(); return (en||vi) ? {en,vi} : null; } };
+  return {
+    getData: ()=>{ const en=enI.value.trim(), vi=viI.value.trim(); return (en||vi) ? {en,vi} : null; },
+    setOptions: (list, pairs)=>{
+      if(pairs) _knownPairs = pairs;
+      if(list) datalistEl.innerHTML = list.map(o=>`<option value="${_escAttr(o)}">`).join("");
+    },
+  };
 }
 
 /* ================= GENERIC ROW-CONFIG BUILDERS ================= */
@@ -477,6 +499,17 @@ function buildActivityTable(containerId, rowSpecs, hasAccumulated){
   table.appendChild(tbody);
   wrap.appendChild(table);
   return {
+    loadDescriptionOptions: async (endpoint)=>{
+      const opts = await fetchLegend(endpoint);  // dung chung co che fetch+retry
+      if(!opts || !opts.descriptions) return;
+      const pairs = {};
+      const enList = opts.descriptions.map(d=>{
+        const {en, vi} = parseSlashPair(d);
+        if(en) pairs[en.toLowerCase()] = vi;
+        return en || d;
+      });
+      rows.forEach(r => r.descField.setOptions(enList, pairs));
+    },
     getData: ()=> rows.map(r=>{
       const item = {
         description: r.descField.getData(),
@@ -543,6 +576,9 @@ function buildManpowerEquipTable(containerId, nRows, hintId){
   table.appendChild(tbody);
   wrap.appendChild(table);
 
+  let _manpowerOptions = [], _manpowerPairs = {};
+  let _equipOptions = [], _equipPairs = {};
+
   function applyLegend(legend){
     const hintEl = document.getElementById(hintId);
     if(!legend){
@@ -562,10 +598,11 @@ function buildManpowerEquipTable(containerId, nRows, hintId){
         mCell.textContent = row.manpower_legend;
         r.manpowerLegendText = row.manpower_legend;
       } else {
-        // Trong trong file mau -> cho nhap moi (vd G15:G17)
+        // Trong trong file mau -> cho nhap moi (vd G15:G17), co droplist
+        // cac loai nhan luc DA CO SAN trong file mau de chon nhanh.
         mCell.innerHTML = "";
         mCell.style.color = "";
-        r.manpowerLegendField = makeBilingualField(mCell, {labelEn:"", labelVi:""});
+        r.manpowerLegendField = makeBilingualField(mCell, {labelEn:"", labelVi:"", enOptions:_manpowerOptions, knownPairs:_manpowerPairs});
         mCell.querySelector("label")?.remove();
       }
       if(row.equip_legend){
@@ -574,15 +611,29 @@ function buildManpowerEquipTable(containerId, nRows, hintId){
       } else {
         eCell.innerHTML = "";
         eCell.style.color = "";
-        r.equipLegendField = makeBilingualField(eCell, {labelEn:"", labelVi:""});
+        r.equipLegendField = makeBilingualField(eCell, {labelEn:"", labelVi:"", enOptions:_equipOptions, knownPairs:_equipPairs});
         eCell.querySelector("label")?.remove();
       }
     });
-    if(hintEl) hintEl.textContent = 'Cột "Loại" lấy trực tiếp từ file mẫu thật — ô còn trống cho phép nhập loại mới.';
+    if(hintEl) hintEl.textContent = 'Cột "Loại" lấy trực tiếp từ file mẫu thật — ô còn trống cho phép nhập loại mới (có gợi ý).';
   }
 
   return {
-    loadLegend: async (endpoint)=> applyLegend(await fetchLegend(endpoint)),
+    loadLegend: async (legendEndpoint, optionsEndpoint)=>{
+      const [legend, opts] = await Promise.all([
+        fetchLegend(legendEndpoint),
+        optionsEndpoint ? fetchLegend(optionsEndpoint) : Promise.resolve(null),
+      ]);
+      if(opts && opts.manpower_types){
+        _manpowerOptions = opts.manpower_types.map(t=>parseSlashPair(t).en || t);
+        opts.manpower_types.forEach(t=>{ const {en,vi} = parseSlashPair(t); if(en) _manpowerPairs[en.toLowerCase()] = vi; });
+      }
+      if(opts && opts.equip_types){
+        _equipOptions = opts.equip_types.map(t=>parseSlashPair(t).en || t);
+        opts.equip_types.forEach(t=>{ const {en,vi} = parseSlashPair(t); if(en) _equipPairs[en.toLowerCase()] = vi; });
+      }
+      applyLegend(legend);
+    },
     getData: ()=> rows.map(r=>{
       const item = {
         manpower_qty: r.tr.querySelector(".manpower_qty").value || null,
@@ -611,12 +662,35 @@ function buildTextList(containerId, count, labels){
   return { getData: ()=> items.map(f=>f.getData()) };
 }
 
+// Danh sach thoi tiet song ngu thuong dung — chon 1 la tu dong dien ca
+// 2 ngon ngu, khong can go tay/dich.
+const WEATHER_OPTIONS = [
+  {en:"Sunny", vi:"Nắng"},
+  {en:"Partly Cloudy", vi:"Có mây"},
+  {en:"Cloudy", vi:"Nhiều mây"},
+  {en:"Overcast", vi:"U ám"},
+  {en:"Rainy", vi:"Mưa"},
+  {en:"Thunderstorm", vi:"Giông bão"},
+  {en:"Normal", vi:"Bình thường"},
+  {en:"Hot", vi:"Nắng nóng"},
+  {en:"Cool", vi:"Mát mẻ"},
+];
+function _weatherConditionSelect(dataKey, label){
+  const opts = WEATHER_OPTIONS.map((o,i)=>`<option value="${i}">${o.en} / ${o.vi}</option>`).join("");
+  return `<div>
+    <label class="field-label">${label}</label>
+    <select class="plain wcond" data-k="${dataKey}">
+      <option value="">— (để trống) —</option>
+      ${opts}
+    </select>
+  </div>`;
+}
 function buildWeatherBlock(containerId){
   const c = document.getElementById(containerId);
   c.innerHTML = `<div class="grid cols-3" style="margin-bottom:10px;">
-      <div><label class="field-label">Sáng / Morning</label><input class="plain wcond" data-k="morning_cond" placeholder="Sunny / Cloudy…"></div>
-      <div><label class="field-label">Chiều / Afternoon</label><input class="plain wcond" data-k="afternoon_cond" placeholder="Sunny / Cloudy…"></div>
-      <div><label class="field-label">Tối / Evening</label><input class="plain wcond" data-k="evening_cond" placeholder="Normal…"></div>
+      ${_weatherConditionSelect("morning_cond", "Sáng / Morning")}
+      ${_weatherConditionSelect("afternoon_cond", "Chiều / Afternoon")}
+      ${_weatherConditionSelect("evening_cond", "Tối / Evening")}
     </div>
     <div class="grid cols-3" style="margin-bottom:10px;">
       <div><label class="field-label">Nhiệt độ sáng / Temp AM (°C)</label><input class="plain wnum" data-k="temp_morning" type="number"></div>
@@ -632,7 +706,10 @@ function buildWeatherBlock(containerId){
   return {
     getData: ()=>{
       const out = {};
-      c.querySelectorAll(".wcond,.wnum").forEach(inp=>{ if(inp.value) out[inp.dataset.k]=inp.value; });
+      c.querySelectorAll(".wcond").forEach(sel=>{
+        if(sel.value !== "") out[sel.dataset.k] = WEATHER_OPTIONS[parseInt(sel.value,10)];
+      });
+      c.querySelectorAll(".wnum").forEach(inp=>{ if(inp.value) out[inp.dataset.k]=inp.value; });
       out.comment = commentField.getData();
       return out;
     }
@@ -644,8 +721,9 @@ const r_location = buildLocationField("r_location");
 const r_activity = buildActivityTable("r_activity_wrap",
   [{preset:true},{preset:true},{preset:true},{preset:true},{preset:false},{preset:false},{preset:false},{preset:false},{preset:false},{preset:false}],
   true);
+r_activity.loadDescriptionOptions("/options/report");
 const r_manpower = buildManpowerEquipTable("r_manpower_wrap", 10, "r_me_hint");
-r_manpower.loadLegend("/legend/report");
+r_manpower.loadLegend("/legend/report", "/options/report");
 const r_inspection = buildTextList("r_inspection", 2);
 const r_nextday = buildTextList("r_nextday", 6);
 const r_weather = buildWeatherBlock("r_weather");
@@ -654,8 +732,9 @@ const p_location = buildLocationField("p_location");
 const p_activity = buildActivityTable("p_activity_wrap",
   [{preset:true},{preset:true},{preset:true},{preset:true},{preset:false},{preset:false},{preset:false},{preset:false}],
   true);
+p_activity.loadDescriptionOptions("/options/plan");
 const p_manpower = buildManpowerEquipTable("p_manpower_wrap", 8, "p_me_hint");
-p_manpower.loadLegend("/legend/plan");
+p_manpower.loadLegend("/legend/plan", "/options/plan");
 const p_inspection = buildTextList("p_inspection", 2);
 const p_nextday = buildTextList("p_nextday", 6);
 const p_weather = buildWeatherBlock("p_weather");

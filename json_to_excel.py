@@ -285,7 +285,7 @@ def build_data_dict(payload: dict, field_map: dict, template_path: str = None):
     w = sp.get("weather") or {}
     wm = field_map["weather"]
     for key in ("morning_cond", "afternoon_cond", "evening_cond"):
-        _set(wm[key], w.get(key), f"weather.{key}")
+        _set(wm[key], _bilingual_or_none(w.get(key)), f"weather.{key}")
     for key in ("temp_morning", "temp_afternoon", "temp_evening", "rainfall", "water_level"):
         _set(wm[key], w.get(key), f"weather.{key}")
     _set(wm["comment"], _bilingual_or_none(w.get("comment")), "weather.comment")
@@ -325,6 +325,39 @@ def read_legend(template_path: str, field_map: dict):
             "equip_legend": ws[f"{cols['equip_legend']}{row}"].value,
         })
     return out
+
+
+def read_options(template_path: str, field_map: dict):
+    """Doc cac gia tri CO SAN THAT trong template (mo ta cong viec, loai
+    nhan luc, loai thiet bi) de lam danh sach 'chon nhanh' (droplist) cho
+    app — luon dung voi file mau, khong hardcode/doan trong Javascript."""
+    import openpyxl as _oxl
+    wb = _oxl.load_workbook(template_path, data_only=True)
+    ws = wb[field_map["sheet"]]
+
+    desc_col = field_map["activity_cols"]["description"]
+    descriptions = []
+    seen = set()
+    for row in field_map["activity_rows"]:
+        v = ws[f"{desc_col}{row}"].value
+        if v and str(v).strip() and str(v).strip() not in seen:
+            seen.add(str(v).strip())
+            descriptions.append(str(v).strip())
+
+    me_cols = field_map["manpower_equip_cols"]
+    manpower_types, equip_types = [], []
+    seen_m, seen_e = set(), set()
+    for row in field_map["manpower_equip_rows"]:
+        mv = ws[f"{me_cols['manpower_legend']}{row}"].value
+        if mv and str(mv).strip() and str(mv).strip() not in seen_m:
+            seen_m.add(str(mv).strip())
+            manpower_types.append(str(mv).strip())
+        ev = ws[f"{me_cols['equip_legend']}{row}"].value
+        if ev and str(ev).strip() and str(ev).strip() not in seen_e:
+            seen_e.add(str(ev).strip())
+            equip_types.append(str(ev).strip())
+
+    return {"descriptions": descriptions, "manpower_types": manpower_types, "equip_types": equip_types}
 
 
 def convert_report(template, payload_path, output_path):

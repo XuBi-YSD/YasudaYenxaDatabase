@@ -28,7 +28,7 @@ from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
-from json_to_excel import REPORT_FIELDS, PLAN_FIELDS, build_data_dict, _decode_photos, read_legend
+from json_to_excel import REPORT_FIELDS, PLAN_FIELDS, build_data_dict, _decode_photos, read_legend, read_options
 from report_engine import generate_daily_report, generate_daily_plan
 
 PORT = 8765
@@ -73,6 +73,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not TEMPLATE_PLAN.exists():
                     return self._error(500, f"Không tìm thấy file mẫu '{TEMPLATE_PLAN.name}'")
                 data = read_legend(TEMPLATE_PLAN, PLAN_FIELDS)
+            elif path == "/options/report":
+                if not TEMPLATE_REPORT.exists():
+                    return self._error(500, f"Không tìm thấy file mẫu '{TEMPLATE_REPORT.name}'")
+                data = read_options(TEMPLATE_REPORT, REPORT_FIELDS)
+            elif path == "/options/plan":
+                if not TEMPLATE_PLAN.exists():
+                    return self._error(500, f"Không tìm thấy file mẫu '{TEMPLATE_PLAN.name}'")
+                data = read_options(TEMPLATE_PLAN, PLAN_FIELDS)
             else:
                 return self._error(404, f"Không có endpoint {path}")
         except Exception as e:

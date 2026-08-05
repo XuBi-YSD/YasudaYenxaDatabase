@@ -457,6 +457,74 @@ class PhotoPageBuilder:
         _to = AnchorMarker(col=col_to, colOff=0, row=row_to, rowOff=0)
         return TwoCellAnchor(editAs="oneCell", _from=_from, to=_to)
 
+    def _col_width_px(self, col_letter):
+        dim = self.ws.column_dimensions.get(col_letter)
+        width_chars = dim.width if (dim and dim.width) else 8.43  # do rong mac dinh Excel
+        return width_chars * 7 + 5   # uoc luong pixel tu "character units"
+
+    def _row_height_px(self, row):
+        dim = self.ws.row_dimensions.get(row)
+        height_pt = dim.height if (dim and dim.height) else 15.0
+        return height_pt * 96 / 72   # pt -> px @96dpi
+
+    def _frame_pixel_size(self, start_row_1idx: int, end_row_1idx: int):
+        width_px = sum(self._col_width_px(c) for c in ("A", "B", "C"))
+        height_px = sum(self._row_height_px(r) for r in range(start_row_1idx, end_row_1idx + 1))
+        return width_px, height_px
+
+    def _px_offset_to_col(self, x_offset_px: float):
+        col_start = column_index_from_string(FRAME_COL_FIRST) - 1
+        remaining = x_offset_px
+        for i, c in enumerate(("A", "B", "C")):
+            w = self._col_width_px(c)
+            if remaining < w:
+                return col_start + i, int(remaining * 9525)
+            remaining -= w
+        return col_start + 2, int(self._col_width_px("C") * 9525)
+
+    def _px_offset_to_row(self, start_row_1idx: int, y_offset_px: float):
+        remaining = y_offset_px
+        r = start_row_1idx
+        while True:
+            h = self._row_height_px(r)
+            if remaining < h:
+                return r - 1, int(remaining * 9525)  # tra ve 0-indexed
+            remaining -= h
+            r += 1
+
+    def _contain_fit_anchor(self, start_row_1idx: int, end_row_1idx: int, img_path: str):
+        """*** FIX: 'ảnh co theo tỷ lệ như khung template, không kéo tràn
+        ô như hiện tại' ***
+        Truoc day dung TwoCellAnchor keo GIAN anh cho vua KHIT toan bo
+        khung (co the lam MEO ty le neu anh khong dung ty le voi khung).
+        Gio: doc kich thuoc THAT cua anh (qua Pillow), tinh ty le "contain"
+        (thu nho vua trong khung, GIU NGUYEN ty le goc, khong bi meo),
+        can giua trong khung theo ca chieu ngang lan doc — giong hanh vi
+        "object-fit: contain" — roi neo anh bang OneCellAnchor voi kich
+        thuoc CO DINH da tinh (khong con bi keo gian theo o nua)."""
+        from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+        from openpyxl.drawing.xdr import XDRPositiveSize2D
+        from PIL import Image as PILImage
+
+        frame_w_px, frame_h_px = self._frame_pixel_size(start_row_1idx, end_row_1idx)
+        with PILImage.open(img_path) as im:
+            img_w_px, img_h_px = im.size
+        if img_w_px <= 0 or img_h_px <= 0:
+            img_w_px, img_h_px = frame_w_px, frame_h_px  # phong ve, tranh chia cho 0
+
+        scale = min(frame_w_px / img_w_px, frame_h_px / img_h_px)
+        disp_w_px = img_w_px * scale
+        disp_h_px = img_h_px * scale
+        offset_x_px = max(0.0, (frame_w_px - disp_w_px) / 2)
+        offset_y_px = max(0.0, (frame_h_px - disp_h_px) / 2)
+
+        col0, colOff = self._px_offset_to_col(offset_x_px)
+        row0, rowOff = self._px_offset_to_row(start_row_1idx, offset_y_px)
+
+        _from = AnchorMarker(col=col0, colOff=colOff, row=row0, rowOff=rowOff)
+        ext = XDRPositiveSize2D(cx=max(1, int(disp_w_px * 9525)), cy=max(1, int(disp_h_px * 9525)))
+        return OneCellAnchor(_from=_from, ext=ext)
+
     def place_photo(self, photo: Photo, index: int):
         """index: 0-based thu tu anh trong toan bo bao cao."""
         block_index = index // 2
@@ -483,7 +551,7 @@ class PhotoPageBuilder:
         start_row, end_row = self._frame_anchor_rows(cap_row, slot)
 
         img = XLImage(photo.path)
-        img.anchor = self._two_cell_anchor(start_row, end_row)
+        img.anchor = self._contain_fit_anchor(start_row, end_row, photo.path)
         self.ws.add_image(img)
 
     def finalize(self, n_photos: int):
